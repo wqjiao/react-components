@@ -1,0 +1,22 @@
+/* 竖屏 -- 指定输出设备中的页面可见区域高度大于或等于宽度 */
+@media screen and (orientation: portrait) {
+    // some css code
+    .app-api {
+        color: #1890ff;
+    }
+}
+/* 横屏 -- 除portrait值情况外，都是landscape */
+@media screen and (orientation: landscape) {
+    // some css code
+    .app-api {
+        color: #00eeff;
+    }
+}
+
+// css 样式
+.haveInput:before {
+    content: attr(placeholder);
+    display: block;
+    color: #333;
+}
+

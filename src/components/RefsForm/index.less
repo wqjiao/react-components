@@ -1,0 +1,188 @@
+// 单复选框
+.wqjiao-check-label {
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    color: rgba(0,0,0,0.65);
+    font-size: 14px;
+    font-variant: tabular-nums;
+    line-height: 1.5;
+    list-style: none;
+    -webkit-font-feature-settings: 'tnum';
+    font-feature-settings: 'tnum';
+    position: relative;
+    display: inline-block;
+    margin-right: 8px;
+    white-space: nowrap;
+    cursor: pointer;
+    // radio/checkbox
+    >input {
+        width: 14px;
+        height: 14px;
+        display: inline-block;
+        text-align: center;
+        margin-right: 5px;
+        vertical-align: middle;
+        position: relative;
+
+        &::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: #fff;
+            width: 100%;
+            height: 100%;
+            border: 1px solid #002a40;
+            box-sizing: border-box;
+        }
+    }
+
+    // radio
+    .wqjiao-radio-input::before {
+        border-radius: 50%;
+    }
+    .wqjiao-radio-input:checked::before {
+        content: "";
+        border: none;
+        background: #fff url('./img/single_radio.png') no-repeat;
+    }
+
+    // checkbox
+    .wqjiao-checkbox-input::before {
+        border-radius: 3px;
+    }
+    .wqjiao-checkbox-input:checked::before {
+        content: "";
+        border: none;
+        background: #002a40 url('./img/multiple_check.png') no-repeat;
+    }
+
+    // 间距
+    & + & {
+        margin-left: 8px;
+    }
+}
+
+// 文本输入框
+.wqjiao-input {
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-variant: tabular-nums;
+    list-style: none;
+    -webkit-font-feature-settings: 'tnum';
+    font-feature-settings: 'tnum';
+    position: relative;
+    display: inline-block;
+    width: 100%;
+    height: 32px;
+    padding: 4px 11px;
+    color: rgba(0,0,0,0.65);
+    font-size: 14px;
+    line-height: 1.5;
+    background-color: #fff;
+    background-image: none;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    -webkit-transition: all .3s;
+    transition: all .3s;
+}
+
+// 按钮
+.wqjiao-btn {
+    line-height: 1.499;
+    display: inline-block;
+    font-weight: 400;
+    text-align: center;
+    -ms-touch-action: manipulation;
+    touch-action: manipulation;
+    cursor: pointer;
+    background-image: none;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    padding: 0 15px;
+    font-size: 14px;
+    border-radius: 4px;
+    height: 32px;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
+    -o-transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
+    transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
+    position: relative;
+    -webkit-box-shadow: 0 2px 0 rgba(0, 0, 0, 0.015);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.015);
+    color: rgba(0, 0, 0, 0.65);
+    background-color: #fff;
+    border-color: #d9d9d9;
+    &:hover,
+    &:focus {
+        text-decoration: none;
+        color: #40a9ff;
+        background-color: #fff;
+        border-color: #40a9ff;
+    }
+    &.wqjiao-btn-primary {
+        color: #fff;
+        background-color: #1890ff;
+        border-color: #1890ff;
+        text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.12);
+        -webkit-box-shadow: 0 2px 0 rgba(0, 0, 0, 0.045);
+        box-shadow: 0 2px 0 rgba(0, 0, 0, 0.045);
+        &:hover,
+        &:focus {
+            color: #fff;
+            background-color: #40a9ff;
+            border-color: #40a9ff;
+        }
+    }
+    & + & {
+        margin-left: 8px;
+    }
+}
+.wqjiao-btn,
+.wqjiao-btn:active,
+.wqjiao-btn:focus {
+    outline: 0;
+}
+
+// 表单子项目
+.wqjiao-form-item {
+    display: flex;
+    .form-item-label {
+        display: inline-block;
+        overflow: hidden;
+        line-height: 40px;
+        color: rgba(0,0,0,0.85);
+        font-size: 14px;
+        white-space: nowrap;
+        text-align: right;
+        vertical-align: middle;
+        &.required::before {
+            display: inline-block;
+            margin-right: 4px;
+            color: #f5222d;
+            font-size: 14px;
+            font-family: SimSun,sans-serif;
+            line-height: 1;
+            content: '*';
+        }
+        &::after {
+            content: ':';
+            position: relative;
+            top: -0.5px;
+            margin: 0 8px 0 2px;
+        }
+    }
+    .form-item-wrapper {
+        flex: 1;
+        position: relative;
+        line-height: 40px;
+        zoom: 1;
+    }
+}
