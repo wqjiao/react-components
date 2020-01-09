@@ -1,8 +1,8 @@
 /*
  * @Author: wqjiao 
  * @Date: 2019-05-30 19:08:49 
- * @Last Modified by: wqjiao
- * @Last Modified time: 2019-09-11 11:46:15
+ * @Last Modified by: qyy
+ * @Last Modified time: 2019-11-29 14:44:09
  * @Description: AntdSelect 封装 antd 组件
  * @use:
  * <AntdSelect
@@ -82,6 +82,7 @@ class AntdSelect extends PureComponent {
             >
                 {data.length > 0 &&
                     data.map(item => {
+                        if (!item) return;
                         return (
                             <Option value={item[valueName]} key={`${name}-${item[valueName]}`}>
                                 {item[labelName]}

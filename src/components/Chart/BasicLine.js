@@ -2,19 +2,24 @@
  * @Author: wqjiao
  * @Date: 2019-05-06 11:49:01
  * @Last Modified by: wqjiao
- * @Last Modified time: 2019-05-10 15:32:52
+ * @Last Modified time: 2019-12-20 10:07:03
  * @Description: BasicLine 基础折线图 -- x 最多显示 10 个坐标点
  */
 import React from 'react';
 import {Chart, Geom, Axis, Tooltip} from 'bizcharts';
+import AntdEmpty from '@/widgets/AntdEmpty';
 
 class BasicLine extends React.Component {
     render() {
         const {x, y, name, padding = 'auto'} = this.props;
         let data = this.props.data,
             range = [0, 1];
-        // fixbug -- length为1，x为类似'2019-05-10'时，range不起作用
-        if (data.length === 1) {
+
+        // 暂无数据图标
+        if (data.length === 0) {
+            return <AntdEmpty />;
+        } else if (data.length === 1) {
+            // fixbug -- length为1，x为类似'2019-05-10'时，range不起作用
             data = data.map(item => {
                 return {
                     ...item,
@@ -23,6 +28,7 @@ class BasicLine extends React.Component {
             });
             range = [0.5, 1];
         }
+
         // 坐标轴刻度个数
         const cols = {
             [x]: {

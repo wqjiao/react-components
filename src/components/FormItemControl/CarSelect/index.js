@@ -1,10 +1,19 @@
 /**
  * 车辆选择器
- * isBrandType 传入时表示仅选择品牌，返回品牌信息
+ * @use
+ <CarSelect
+    carType={carType} // 车辆类型，1:乘用车; 2:上用户侧
+    dispatch={dispatch}
+    inputValue={modelName} // isPropsName与modelName一起使用
+    changeCarSelect={this.changeCarSelect} // 修改props.modelName的回调
+    onRef={this.onRef} // 可选，父组件通过 ref 调用 setInputValue 方法修改 inputValue
+ />
  */
 import React, {PureComponent} from 'react';
+import {Icon} from 'antd';
 import styles from './index.less';
 
+// isPropsName true 表示使用并仅修改 props.modelName
 class CarSelect extends PureComponent {
     constructor(props) {
         super(props);
@@ -20,22 +29,35 @@ class CarSelect extends PureComponent {
             serieName: '',
             models: [],
             modelsOpen: false,
-            modelId: '',
+            modelId: this.props.value,
             modelName: '',
             carType: this.props.carType,
         };
     }
 
     componentDidMount() {
+        // 可选，父组件通过 ref 调用 setInputValue 方法修改 inputValue
+        const {onRef} = this.props;
+        if (onRef) {
+            onRef(this);
+        }
         this.getBrand();
     }
 
+    // 父组件通过 ref 调用 setInputValue 方法修改 inputValue
+    setInputValue = inputValue => {
+        const {placeholder = '请选择'} = this.props;
+        this.setState({
+            inputValue: inputValue || placeholder,
+        });
+    };
+
     getBrand() {
         if (this.props.carType) {
-            let {dispatch} = this.props;
+            let {dispatch, placeholder = '请选择'} = this.props;
             if (!this.props.inputValue) {
                 this.setState({
-                    inputValue: '请选择',
+                    inputValue: placeholder,
                 });
             }
             dispatch({
@@ -116,7 +138,6 @@ class CarSelect extends PureComponent {
         let serieId = e.currentTarget.getAttribute('data-id');
         let serieName = e.currentTarget.getAttribute('data-name');
         let {dispatch} = this.props;
-        
         this.setState({
             serieId,
             serieName,
@@ -157,23 +178,15 @@ class CarSelect extends PureComponent {
             modelName: modelName,
             modelPrice: modelPrice,
         };
-        this.props.changeCarSelect(callbackData);
-    };
-
-    /**
-     * @description 传入 isBrandType时，表示仅选择品牌
-     * @returns 返回品牌信息
-     */
-    selectBrandType = e => {
-        let brandId = e.currentTarget.getAttribute('data-id');
-        let brandName = e.currentTarget.getAttribute('data-name');
-        this.setState({
-            brandId,
-            brandName,
-            inputValue: brandName,
-            brandOpen: false,
-        });
-        this.props.changeCarSelect({brandId, brandName});
+        const {onChange, changeCarSelect} = this.props;
+        // 修改车型id
+        if (onChange) {
+            onChange(modelId);
+        }
+        // 回传需要的其他值
+        if (changeCarSelect) {
+            changeCarSelect(callbackData);
+        }
     };
 
     //创建左侧导航栏
@@ -209,7 +222,6 @@ class CarSelect extends PureComponent {
      * @return {[type]} [description]
      */
     createBrand = () => {
-        const {isBrandType = false} = this.props;
         const {brands, brandId} = this.state;
         let initial = '';
 
@@ -226,8 +238,7 @@ class CarSelect extends PureComponent {
                             className={brandId === v.id ? 'Selected' : ''}
                             data-id={v.id}
                             data-name={v.name}
-                            // onClick={this.selectBrand}
-                            onClick={isBrandType ? this.selectBrandType : this.selectBrand}
+                            onClick={this.selectBrand}
                         >
                             {v.name}
                         </p>
@@ -241,8 +252,7 @@ class CarSelect extends PureComponent {
                         className={brandId === v.id ? 'Selected' : ''}
                         data-id={v.id}
                         data-name={v.name}
-                        // onClick={this.selectBrand}
-                        onClick={isBrandType ? this.selectBrandType : this.selectBrand}
+                        onClick={this.selectBrand}
                     >
                         {v.name}
                     </p>
@@ -343,11 +353,48 @@ class CarSelect extends PureComponent {
         });
     };
 
+    // 清空选中数据
+    handleClearLabel = () => {
+        this.setState({
+            modelId: '',
+            inputValue: this.props.placeholder || '请选择',
+            modelName: '',
+            brandOpen: false,
+            seriesOpen: false,
+            modelsOpen: false,
+            brandName: '',
+            serieName: '',
+        });
+        let callbackData = {
+            brandName: '',
+            serieName: '',
+            modelId: '',
+            modelName: '',
+            modelPrice: '',
+        };
+        const {onChange, changeCarSelect} = this.props;
+        // 修改车型id
+        if (onChange) {
+            onChange('');
+        }
+        // 回传需要的其他值
+        if (changeCarSelect) {
+            changeCarSelect(callbackData);
+        }
+    };
+
     render() {
-        const {inputValue, brandOpen, seriesOpen, modelsOpen, brandId, serieId} = this.state;
-        const {carInfo} = this.props;
-        const style =
-            inputValue === ('请选择' || inputValue === '请选择车型信息') ? {color: '#bbb'} : {};
+        const {
+            inputValue,
+            brandOpen,
+            seriesOpen,
+            modelsOpen,
+            brandId,
+            serieId,
+            modelId,
+        } = this.state;
+        const {carInfo, placeholder = '请选择'} = this.props;
+        let style = inputValue === placeholder ? {color: '#bbb'} : {};
 
         return (
             <div
@@ -375,6 +422,14 @@ class CarSelect extends PureComponent {
                     <span className="ant-select-arr ow">
                         <b />
                     </span>
+                    {/* 清空选中数据 */}
+                    {modelId && (
+                        <Icon
+                            type="close-circle"
+                            className={styles.closeCircle}
+                            onClick={this.handleClearLabel}
+                        />
+                    )}
                 </div>
                 <div className={styles.CarSelectUl}>
                     {brandOpen ? (

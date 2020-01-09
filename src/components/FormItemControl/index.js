@@ -2,16 +2,32 @@
  * @Author: wqjiao
  * @Date: 2019-08-02 18:42:08
  * @Last Modified by: wqjiao
- * @Last Modified time: 2019-09-11 12:01:10
+ * @Last Modified time: 2020-01-09 11:07:56
  * @Description: 动态配置表单：输入方式、必选填、长度
  */
 import React, {PureComponent} from 'react';
-import {Row, Col, Form, Input, InputNumber, Radio, Checkbox, DatePicker} from 'antd';
+import {
+    Row,
+    Col,
+    Form,
+    Input,
+    InputNumber,
+    Radio,
+    Checkbox,
+    DatePicker,
+    Select,
+    Cascader,
+} from 'antd';
 import moment from 'moment';
-import AntdSelect from '../AntdSelect';
-import LocationCascader from '../LocationCascader';
-import DoubleNumber from './components/DoubleNumber';
-import TextInputNumber from './components/TextInputNumber';
+import AntdSelect from '@/widgets/AntdSelect';
+import CarSelect from '@/widgets/CarSelect';
+import LocationCascader from '@/widgets/FormItem/LocationCascader';
+import PlainText from '@/widgets/FormItem/PlainText';
+import DoubleNumber from '@/widgets/FormItem/DoubleNumber';
+import TextInputNumber from '@/widgets/FormItem/TextInputNumber';
+import LongTermPicker from '@/widgets/FormItem/LongTermPicker';
+import LongRangePicker from '@/widgets/FormItem/LongRangePicker';
+import FixedTelephone from '@/widgets/FormItem/FixedTelephone';
 import {
     addIsLeaf,
     limitDecimals,
@@ -19,20 +35,15 @@ import {
     arrJoinStr,
     getPhoneValue,
     getIdentityValue,
-    getFixedTelephone,
 } from '@/utils/funcUtils';
-import {MobileReg, IdentityReg, FixedTelephoneRge} from '@/utils/constants';
+import {MobileReg, IdentityReg} from '@/utils/constants';
 
 const FormItem = Form.Item;
 const RadioGroup = Radio.Group;
 const {TextArea} = Input;
 const CheckboxGroup = Checkbox.Group;
 const {RangePicker} = DatePicker;
-const maxLimit = {
-    8: /^(\d{1,5})$/,
-    10: /^(\d{1,7})$/,
-    11: /^(\d{1,8})$/,
-}; // 输入框限制
+const {Option} = Select;
 const inputTypes = [
     'TextArea',
     'Input',
@@ -45,25 +56,69 @@ const inputTypes = [
     'DoubleNumber',
     'TextInputNumber',
 ];
+const dateFormat = 'YYYY-MM-DD';
 
 class FormItemControl extends PureComponent {
     // 前者数值不能大于后者数值
     validatorRules(required, limit, rule, value, callback) {
-        const hasLength = value && value.length > 0;
-        // 用户做了输入操作
-        if (required && hasLength && (value.length < 2 || !(value[0] + ''))) {
-            callback('请输入相应数值');
+        if (value && value.length > 0) {
+            // 用户做了输入操作
+            if (required && (value.length < 2 || !(value[0] + ''))) {
+                callback('请输入相应数值');
+            }
+            if (value[0] > value[1]) {
+                callback('下限数值不能大于上限数值');
+            }
+            if (limit.length === 2) {
+                if (value[0] < limit[0] || value[1] < limit[0]) {
+                    callback(`比例不能低于${limit[0]}`);
+                }
+                if (value[0] > limit[1] || value[1] > limit[1]) {
+                    callback(`比例不能超过${limit[1]}`);
+                }
+            }
         }
-        if (hasLength && value[0] > value[1]) {
-            callback('下限数值不能大于上限数值');
+
+        callback();
+    }
+
+    /**
+     * @method 日期选择控制
+     * @param {*} [current] 日期
+     * @param {String} dateType 判断今天之前之后
+     * @param {Number} dateLength 之前之后天数
+     */
+    disabledDate = (current, dateType, dateLength) => {
+        // 仅选择今天之前的日期
+        if (dateType === 'before') {
+            // 往前推 dateLength 天
+            if (dateLength) {
+                return current > moment().subtract(dateLength, 'days');
+            }
+            return current && current > moment().endOf('day');
+        } else if (dateType === 'after') {
+            // 往后推 dateLength 天
+            if (dateLength) {
+                return current < moment().add(dateLength, 'days');
+            }
+            return current && current < moment().endOf('day');
         }
-        if (limit && hasLength && (value[0] < limit[0] || value[1] < limit[0])) {
-            callback(`比例不能低于${limit[0]}`);
+    };
+
+    // 校验整数/浮点数数字:长度或者上下限
+    validatorNumber(validator, rule, value, callback) {
+        // 上下限、name、最大长度、最大值
+        const {limit, fieldName, numberLength, maxValue} = validator;
+
+        if (limit.length === 2 && (value < limit[0] || value > limit[1])) {
+            callback(`${fieldName}需在${limit[0]}-${limit[1]}范围内！`);
+        } else if (numberLength && value > maxValue) {
+            callback(`${fieldName}不能超过${maxValue}！`);
+        } else if (value < 0) {
+            callback(`${fieldName}不能小于0！`);
         }
-        if (limit && hasLength && (value[0] > limit[1] || value[1] > limit[1])) {
-            callback(`比例不能超过${limit[1]}`);
-        }
-        callback(); // 校验通过
+
+        callback();
     }
 
     // 渲染 FormItem
@@ -72,53 +127,62 @@ class FormItemControl extends PureComponent {
             formData,
             dispatch,
             form: {getFieldDecorator},
-            formItemOptions,
+            formItemOptions = {rules: [], getValueFromEvent: null},
+            carType, // 车辆类型
+            onInputChange = () => {}, // Input/InputNumber onChange 事件
+            addonAfter = '', // Input 后置标签
+            limitLength = 8, // 固定电话位数限制
         } = this.props;
-        const dateFormat = 'YYYY-MM-DD';
-        let {
+        let itemChild = '',
+            {
                 fieldName,
                 name,
                 formType,
                 fieldValue,
                 fieldCodes,
-                dictList,
-                validateType: {notNull, canEdit, maxLength, limit},
-            } = formData,
-            itemChild = '';
+                dictList = [],
+                validateType,
+                detail,
+            } = formData;
         const isInput = inputTypes.includes(formType);
-        dictList = dictList.length < 1 ? [] : dictList; // 判断数组是否有值
+        let {notNull, canEdit = true, maxLength, limit = [], dateType, dateLength} = validateType;
+
+        limit = limit || [].map(item => parseFloat(item));
+        dictList = dictList || []; // 判断数组是否有值
+        notNull = notNull ? true : false;
+        canEdit = canEdit ? true : false;
 
         // 地区选择器+详情
         if (formType === 'CascaderInput') {
-            return this.renderCascader();
+            if (!detail || !detail.name) {
+                formType = 'Cascader';
+            } else {
+                return this.renderCascader();
+            }
         }
 
         // 是否必填规则
-        const requiredRule =
-            formType === 'Input'
-                ? [
-                      {
-                          required: notNull,
-                          whitespace: true,
-                          message: `请输入${fieldName}`,
-                      },
-                  ]
-                : [
-                      {
-                          required: notNull,
-                          message: isInput ? `请输入${fieldName}` : `请选择${fieldName}`,
-                      },
-                  ];
+        let requiredRule = [];
+        if (formType === 'Input') {
+            requiredRule.push({
+                required: notNull,
+                whitespace: true,
+                message: `请输入${fieldName}`,
+            });
+        } else {
+            requiredRule.push({
+                required: notNull,
+                message: isInput ? `请输入${fieldName}` : `请选择${fieldName}`,
+            });
+        }
         // 文本输入框最大长度提示
-        const maxLengthRule =
-            formType === 'TextArea' || formType === 'Input'
-                ? [
-                      {
-                          max: maxLength || null,
-                          message: `${fieldName}不能超过${maxLength}位！`,
-                      },
-                  ]
-                : [];
+        let maxLengthRule = [];
+        if (formType === 'TextArea' || formType === 'Input') {
+            maxLengthRule.push({
+                max: maxLength || null,
+                message: `${fieldName}不能超过${maxLength}位！`,
+            });
+        }
 
         // 表单其他参数配置
         const options = {
@@ -127,11 +191,16 @@ class FormItemControl extends PureComponent {
             getValueFromEvent: formItemOptions.getValueFromEvent || null,
         };
 
+        // 数字输入框最大长度:表示最大整数位
+        let intLength = maxLength || 7; // 整数最大长度
+        const floatLength = maxLength ? maxLength - 2 : 7; // 小数的整数位最大长度
+
         switch (formType) {
+            case 'PlainText':
+                itemChild = <PlainText value={fieldValue} />;
+                break;
             case 'Text':
-                itemChild = getFieldDecorator(name, {initialValue: fieldValue})(
-                    <span>{fieldValue}</span>
-                );
+                itemChild = getFieldDecorator(name, {initialValue: fieldValue})(<PlainText />);
                 break;
             case 'TextArea':
                 itemChild = getFieldDecorator(name, options)(
@@ -140,7 +209,13 @@ class FormItemControl extends PureComponent {
                 break;
             case 'Input': {
                 itemChild = getFieldDecorator(name, options)(
-                    <Input placeholder="请输入" disabled={!canEdit} />
+                    <Input
+                        placeholder="请输入"
+                        disabled={!canEdit}
+                        onChange={e => onInputChange(e.target.value)}
+                        addonAfter={addonAfter}
+                        maxLength={maxLength || null}
+                    />
                 );
                 break;
             }
@@ -165,12 +240,13 @@ class FormItemControl extends PureComponent {
                     rules: [
                         ...options.rules,
                         {
-                            pattern: new RegExp(FixedTelephoneRge, 'g'),
+                            pattern: new RegExp(`^0\\d{2,3}-\\d{7,${limitLength}}$`, 'g'),
                             message: `请正确输入${fieldName}`,
                         },
                     ],
-                    getValueFromEvent: e => getFixedTelephone(e),
-                })(<Input placeholder="请输入" maxLength={13} disabled={!canEdit} />);
+                })(
+                    <FixedTelephone placeholder="请输入" disabled={!canEdit} length={limitLength} />
+                );
                 break;
             }
             case 'InputIdentity': {
@@ -192,82 +268,86 @@ class FormItemControl extends PureComponent {
                     <InputNumber
                         placeholder="请输入"
                         style={{width: '100%'}}
-                        formatter={value => limitDecimals(value)}
-                        parser={value => limitDecimals(value)}
-                        min={limit ? limit[0] : 0}
-                        max={limit ? limit[1] : 1000000000}
-                        maxLength={maxLength || 10}
-                    />
-                );
-                break;
-            case 'InputIntNumber':
-                itemChild = getFieldDecorator(name, {
-                    ...options,
-                    rules: [
-                        ...options.rules,
-                        {
-                            validator: (rule, value, callback) => {
-                                if (value && maxLength && value > Math.pow(10, maxLength)) {
-                                    callback(`${fieldName}不能超过${Math.pow(10, maxLength)}！`);
-                                }
-                                callback();
-                            },
-                        },
-                    ],
-                })(
-                    <InputNumber
-                        placeholder="请输入"
-                        style={{width: '100%'}}
                         formatter={value => inputNumber(value)}
                         parser={value => inputNumber(value)}
-                        min={limit ? limit[0] : 0}
-                        max={limit ? limit[1] : 1000000000}
-                        maxLength={maxLength || 10}
-                        disabled={!canEdit}
+                        maxLength={maxLength || null}
+                        onChange={onInputChange}
                     />
                 );
                 break;
-            case 'InputFloatNumber': {
-                maxLength = maxLength || 10;
+            case 'InputIntNumber': {
+                const maxValue = Math.pow(10, intLength) - 1;
                 itemChild = getFieldDecorator(name, {
                     ...options,
                     rules: [
                         ...options.rules,
                         {
-                            validator: (rule, value, callback) => {
-                                if (value && maxLength && value > Math.pow(10, maxLength - 2)) {
-                                    callback(
-                                        `${fieldName}不能超过${Math.pow(10, maxLength - 2)}！`
-                                    );
-                                }
-                                callback();
-                            },
+                            validator: this.validatorNumber.bind(this, {
+                                limit,
+                                fieldName,
+                                numberLength: intLength,
+                                maxValue,
+                            }),
                         },
                     ],
                 })(
                     <InputNumber
                         placeholder="请输入"
                         style={{width: '100%'}}
-                        formatter={value =>
-                            limitDecimals(value, maxLimit[maxLength], maxLength - 3)
-                        }
-                        parser={value => limitDecimals(value, maxLimit[maxLength], maxLength - 3)}
-                        min={limit ? limit[0] : 0}
-                        max={limit ? limit[1] : 9999999.99}
-                        maxLength={maxLength}
+                        formatter={inputNumber}
+                        parser={inputNumber}
+                        maxLength={intLength}
                         disabled={!canEdit}
+                        onChange={onInputChange}
+                        max={maxValue}
+                    />
+                );
+                break;
+            }
+            case 'InputFloatNumber': {
+                const maxValue = Math.pow(10, floatLength) - 0.01;
+                itemChild = getFieldDecorator(name, {
+                    ...options,
+                    rules: [
+                        ...options.rules,
+                        {
+                            validator: this.validatorNumber.bind(this, {
+                                limit,
+                                fieldName,
+                                numberLength: floatLength,
+                                maxValue,
+                            }),
+                        },
+                    ],
+                })(
+                    <InputNumber
+                        placeholder="请输入"
+                        style={{width: '100%'}}
+                        formatter={value => limitDecimals(value, floatLength)}
+                        parser={value => limitDecimals(value, floatLength)}
+                        maxLength={floatLength + 3}
+                        disabled={!canEdit}
+                        onChange={onInputChange}
+                        max={maxValue}
                     />
                 );
                 break;
             }
             case 'TextInputNumber':
-                itemChild = getFieldDecorator(name, options)(
-                    <TextInputNumber
-                        data={dictList}
-                        maxLimit={maxLimit}
-                        validateType={formData.validateType}
-                    />
-                );
+                itemChild = getFieldDecorator(name, {
+                    ...options,
+                    rules: [
+                        ...options.rules,
+                        {
+                            validator: this.validatorNumber.bind(this, {
+                                limit,
+                                fieldName,
+                                numberLength: maxLength || 7,
+                                maxValue: Math.pow(10, maxLength) - 1,
+                            }),
+                        },
+                    ],
+                })(<TextInputNumber data={dictList} validateType={validateType} />);
                 break;
             case 'DoubleNumber': {
                 itemChild = getFieldDecorator(name, {
@@ -276,13 +356,14 @@ class FormItemControl extends PureComponent {
                         ...options.rules,
                         {validator: this.validatorRules.bind(this, notNull, limit)},
                     ],
-                })(<DoubleNumber limit={limit || ''} />);
+                })(<DoubleNumber limit={limit || []} />);
                 break;
             }
             case 'Select': {
                 itemChild = getFieldDecorator(name, {
                     ...options,
-                    initialValue: (fieldCodes && fieldCodes.join(',')) || [],
+                    initialValue:
+                        fieldCodes && fieldCodes.length > 0 ? fieldCodes.join(',') : undefined,
                 })(
                     <AntdSelect
                         data={dictList}
@@ -293,6 +374,11 @@ class FormItemControl extends PureComponent {
                 );
                 break;
             }
+            case 'CascaderSelect':
+                itemChild = getFieldDecorator(name, {...options, initialValue: fieldCodes})(
+                    <Cascader placeholder="请选择" options={dictList} />
+                );
+                break;
             case 'Cascader':
                 itemChild = getFieldDecorator(name, {...options, initialValue: fieldCodes})(
                     <LocationCascader
@@ -301,11 +387,16 @@ class FormItemControl extends PureComponent {
                         isChooseCity={formData.isCity}
                         labelText={arrJoinStr(fieldValue, '/')}
                         disabled={!canEdit}
+                        onRef={this.props.onRef || null}
                     />
                 );
                 break;
             case 'Radio':
-                itemChild = getFieldDecorator(name, {...options, initialValue: fieldCodes})(
+                itemChild = getFieldDecorator(name, {
+                    ...options,
+                    initialValue:
+                        fieldCodes && fieldCodes.length > 0 ? fieldCodes.join(',') : undefined,
+                })(
                     <RadioGroup disabled={!canEdit}>
                         {dictList.map(item => {
                             return (
@@ -340,7 +431,26 @@ class FormItemControl extends PureComponent {
                 itemChild = getFieldDecorator(name, {
                     ...options,
                     initialValue: fieldValue ? moment(fieldValue, dateFormat) : undefined,
-                })(<DatePicker format={dateFormat} disabled={!canEdit} />);
+                })(
+                    <DatePicker
+                        format={dateFormat}
+                        disabled={!canEdit}
+                        onChange={value => this.handleSelect(value, name)}
+                        style={{width: '100%'}}
+                        disabledDate={current => this.disabledDate(current, dateType, dateLength)}
+                    />
+                );
+                break;
+            case 'LongTermPicker':
+                itemChild = getFieldDecorator(name, {
+                    ...options,
+                    initialValue: fieldValue ? moment(fieldValue, dateFormat) : undefined,
+                })(
+                    <LongTermPicker
+                        disabled={!canEdit}
+                        disabledDate={current => this.disabledDate(current, dateType, dateLength)}
+                    />
+                );
                 break;
             case 'RangePicker': {
                 fieldValue =
@@ -352,9 +462,45 @@ class FormItemControl extends PureComponent {
                 );
                 break;
             }
+            case 'LongRangePicker': {
+                fieldValue =
+                    fieldValue && fieldValue.length > 0
+                        ? [moment(fieldValue[0], dateFormat), moment(fieldValue[1], dateFormat)]
+                        : undefined;
+                itemChild = getFieldDecorator(name, {...options, initialValue: fieldValue})(
+                    <LongRangePicker disabled={!canEdit} />
+                );
+                break;
+            }
+            case 'SelectVehicle': {
+                itemChild = getFieldDecorator(name, {
+                    ...options,
+                    initialValue: fieldCodes && fieldCodes.length > 0 ? fieldCodes.join(',') : [],
+                })(
+                    carType ? (
+                        <CarSelect
+                            inputValue={fieldValue}
+                            changeCarSelect={value => this.handleSelect(value, name)}
+                            carType={carType}
+                            dispatch={dispatch}
+                            onRef={this.props.onRef || null}
+                        />
+                    ) : (
+                        <Select allowClear={true} placeholder="请选择" disabled={!canEdit}>
+                            <Option key="carType" />
+                        </Select>
+                    )
+                );
+                break;
+            }
             default:
                 itemChild = getFieldDecorator(name, options)(
-                    <Input placeholder="请输入" maxLength={maxLength} disabled={!canEdit} />
+                    <Input
+                        placeholder="请输入"
+                        maxLength={maxLength}
+                        disabled={!canEdit}
+                        onChange={e => onInputChange(e.target.value)}
+                    />
                 );
                 break;
         }
@@ -367,65 +513,77 @@ class FormItemControl extends PureComponent {
         const {
             dispatch,
             form: {getFieldDecorator},
-            formData: {
-                fieldName,
-                name,
-                dictList,
-                fieldCodes,
-                fieldValue,
-                validateType: {notNull, canEdit, maxLength = 200},
-                detail,
-            },
+            formData: {fieldName, name, dictList, fieldCodes, fieldValue, validateType, detail},
         } = this.props;
+        let {notNull = false, canEdit = true, maxLength = 200} = validateType;
+
+        notNull = notNull ? true : false;
+        canEdit = canEdit ? true : false;
+
+        const detailValidate = detail.validateType || {};
+        const required = detailValidate.hasOwnProperty('notNull')
+            ? !!detailValidate.notNull
+            : false;
+        const disabled = detailValidate.hasOwnProperty('canEdit') ? !detailValidate.canEdit : false;
 
         return (
             <Row gutter={{md: 8, lg: 24, xl: 24}}>
-                {dictList.length > 0 && (
-                    <Col lg={10} xs={14}>
-                        <FormItem label={fieldName}>
-                            {getFieldDecorator(name, {
-                                initialValue: fieldCodes || [],
+                <Col lg={10} xs={14}>
+                    <FormItem label={fieldName}>
+                        {getFieldDecorator(name, {
+                            initialValue: fieldCodes || [],
+                            rules: [
+                                {
+                                    required: notNull,
+                                    message: `请选择${fieldName}`,
+                                },
+                                {
+                                    validator: (rule, value, callback) => {
+                                        if (notNull && value.length > 0 && value.length < 3) {
+                                            callback('请选择相应的省市区');
+                                        }
+                                        callback();
+                                    },
+                                },
+                            ],
+                        })(
+                            <LocationCascader
+                                locations={addIsLeaf(dictList)}
+                                dispatch={dispatch}
+                                labelText={arrJoinStr(fieldValue, '/')}
+                                disabled={!canEdit}
+                                onRef={this.props.onRef || null}
+                            />
+                        )}
+                    </FormItem>
+                </Col>
+                {/* 存在detail时显示 */}
+                {detail.name && (
+                    <Col lg={14} xs={10}>
+                        <FormItem>
+                            {getFieldDecorator(detail.name, {
+                                initialValue: detail.fieldValue ? detail.fieldValue + '' : '',
                                 rules: [
                                     {
-                                        required: notNull,
-                                        message: `请选择${fieldName}`,
+                                        required: required,
+                                        whitespace: true,
+                                        message: '请输入详细地址',
+                                    },
+                                    {
+                                        max: maxLength || null,
+                                        message: `详细地址不能超过${maxLength}位！`,
                                     },
                                 ],
                             })(
-                                <LocationCascader
-                                    locations={addIsLeaf(dictList)}
-                                    dispatch={dispatch}
-                                    labelText={arrJoinStr(fieldValue, '/')}
-                                    disabled={!canEdit}
+                                <Input
+                                    placeholder="请输入"
+                                    style={{width: '100%'}}
+                                    disabled={disabled}
                                 />
                             )}
                         </FormItem>
                     </Col>
                 )}
-                <Col lg={14} xs={10}>
-                    <FormItem>
-                        {getFieldDecorator(detail.name, {
-                            initialValue: detail.fieldValue || '',
-                            rules: [
-                                {
-                                    required: notNull,
-                                    whitespace: true,
-                                    message: '请输入详细地址',
-                                },
-                                {
-                                    max: maxLength || null,
-                                    message: `详细地址不能超过${maxLength}位！`,
-                                },
-                            ],
-                        })(
-                            <Input
-                                placeholder="请输入"
-                                style={{width: '100%'}}
-                                disabled={!detail.validateType.canEdit}
-                            />
-                        )}
-                    </FormItem>
-                </Col>
             </Row>
         );
     };
@@ -433,7 +591,6 @@ class FormItemControl extends PureComponent {
     // 选拉框改变
     handleSelect = (value, name) => {
         const {handleSelect} = this.props;
-
         // 判断是否存在回调
         if (handleSelect) {
             handleSelect(value, name);
@@ -442,10 +599,10 @@ class FormItemControl extends PureComponent {
 
     render() {
         const {width} = this.props.formData;
-        let span = width === 3 ? 24 : width === 2 ? 16 : width === 1.5 ? 12 : 8;
+        const spans = {1: 8, 1.5: 12, 2: 16, 3: 24}; // 栅格
 
         return (
-            <Col xl={span} sm={24} xs={24}>
+            <Col xl={spans[width] || 8} sm={24} xs={24}>
                 {this.renderFormItemChild()}
             </Col>
         );
